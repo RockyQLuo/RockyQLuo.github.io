@@ -25,3 +25,8 @@ package-lock.json
 # Misc
 _sass/dist
 assets/js/dist
+
+_posts/.obsidian/*
+_posts/.obsidian/.*
+_posts/.placeholder
+*.DS_Store
