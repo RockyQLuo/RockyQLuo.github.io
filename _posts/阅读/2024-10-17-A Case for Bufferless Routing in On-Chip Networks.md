@@ -62,7 +62,7 @@ img_path: /assets/img/paper/
 
 本文设计没有VC 没有Buffer，消除了BW和VA/SA
 
-![流水线优化]({{ page.img_path }流水线Route.png){: width="972" height="589" }
+![流水线优化]({{ page.img_path }}流水线Route.png){: width="972" height="589" }
 **（lookahead）技术**来进一步优化，如图 1(c) 所示。其基本思想是在 flit（流控单元）实际到达之前的一个时钟周期，通过一条独立的窄带链路提前传递足够的关于该 flit 的信息。
 
 具体来说，预见信息的链路传输（简称 LA LT）与 flit 的交换机传输（ST）是并行进行的。当 flit 本身在链路上传输时，下一个路由器利用预先收到的预见信息执行路由计算（RC）。路由计算的结果被存储在通向 ST 阶段的流水线锁存器中。
