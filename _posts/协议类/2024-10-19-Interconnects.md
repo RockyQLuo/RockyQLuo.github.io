@@ -35,7 +35,7 @@ Round trip delay：buffer清空到下一个flit可以被处理的时间间隔
 ideal 的latency有一个计算公式：$T_{ideal}=\frac{D}{v}+\frac{L}{b}$
 和曼哈顿距离(D)，传播速度(v)，包大小(L)以及带宽(b)有关，实际还要考虑一些contention
 
-![latence_inject.png]({{ page.img_path }}latence_inject.png.png){: width="972" height="589" }
+![latence_inject]({{ page.img_path }}latence_inject.png){: width="972" height="589" }
 
 两种cache coherence的methods：
 * Snoopy Bus
