@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 《interconnect》
+title: interconnect
 date: 2024-10-19 12:40 +0800
 categories: [读书笔记, NOC]
 tags: []
@@ -18,13 +18,20 @@ img_path: /assets/img/paper/
 - Store and Forward：每一个路由需要收到完整的包才可以发送到下一个路由
 - Cut-Through：收到了头及资源分配就可以发出去了（buffer和带宽还是full packets，数据包太大就会有问题，这时候见虫洞）
 - wormhole（虫洞）：body 跟随头flit
+
 > 存在一个问题：虫洞会受头部阻塞影响， 由于queue的先入先出，红色包必须要等待蓝色释放。可以用VC来解决这个问题
 {: .prompt-warning }
+
 ![head_blocking issue]({{ page.img_path }}head_blocking.png){: width="972" height="589" }
 ![VC]({{ page.img_path }}VC.png){: width="972" height="589" }
 
+
+
+
+
 ## 防止死锁
 - 协议级：防止由于不同的包的混合而产生循环，例如把数据和地址的包分开始用不同的VC传输
+ 
 剩余的可以参见[《NOC学习记录》](https://rockyqluo.github.io/posts/noc/)
 
 ## 上下级buffer可用性的信息传递（communicating buffer availability）
@@ -33,6 +40,7 @@ Round trip delay：buffer清空到下一个flit可以被处理的时间间隔
 
 
 ideal 的latency有一个计算公式：$T_{ideal}=\frac{D}{v}+\frac{L}{b}$
+
 和曼哈顿距离(D)，传播速度(v)，包大小(L)以及带宽(b)有关，实际还要考虑一些contention
 
 ![latence_inject]({{ page.img_path }}latence_inject.png){: width="972" height="589" }
