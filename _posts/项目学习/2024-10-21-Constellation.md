@@ -38,14 +38,12 @@ trait PhysicalTopology {
 
 - Terminal Router Topologies在原有路由基础上包装进一步拓扑,`TerminalRouter`拓扑必须与`TerminalRouting`路由关系包装器一起使用
 
-![terminal_topology]({{ page.img_path }}terminal.png){: width="972" height="589" }
-<a id="terminal"></a>
+![terminal_topology]({{ page.img_path }}terminal.png){: width="972" height="589" }<a id="terminal"></a>
 
 
 - Hierarchical分层拓扑,`HierarchicalTopology`拓扑必须与`HierarchicalRouting`路由关系包装器一起使用
 
-![Hierarchical]({{ page.img_path }}Hierarchical.png){: width="972" height="589" }
-<a id="Hierarchical"></a>
+![Hierarchical]({{ page.img_path }}Hierarchical.png){: width="972" height="589" }<a id="Hierarchical"></a>
 
 ### Channels
 
