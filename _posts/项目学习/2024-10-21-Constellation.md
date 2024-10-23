@@ -45,6 +45,8 @@ trait PhysicalTopology {
 
 ![Hierarchical]({{ page.img_path }}Hierarchical.png){: width="972" height="589" }<span id="Hierarchical"></span>
 
+![topo_archi]({{ page.img_path }}topo_archi.png){: width="972" height="589" }
+
 ### Channels
 
 PhysicalTopology指向的每条edge都会调用函数来确定通道参数
