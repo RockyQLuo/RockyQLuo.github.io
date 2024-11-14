@@ -6,7 +6,6 @@ categories: [读书笔记, paper]
 tags: []
 img_path: /assets/img/paper/
 ---
-<script> var password = prompt("请输入密码："); if (password !== "xiaokai") {document.body.innerHTML = "访问被拒绝。"; } </script>
 
 
 论文中提出的BLESS算法是无缓冲路由的一种实现方式。当目标输出端口被占用时，路由器通过偏移让数据包选择非理想路径继续前进，从而避免堵塞。尽管无缓冲路由在能量效率上有显著优势，但也会增加数据包的延迟，特别是在发生偏移的情况下。然而，<font color="#d99694">论文指出在许多实际应用中，网络负载较低，偏移事件发生较少(CPU持续注入，一段时间没得到回应就停止注入了)</font>，因此不会对整体性能造成显著影响。但是，无缓冲区路由不能轻易应用于具有定向链路的网络，例如 Butterfly 网络。因为被转移的数据包可能无法再到达其目的地
