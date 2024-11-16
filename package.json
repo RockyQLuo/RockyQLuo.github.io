@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "hexo-renderer-markdown-it-plus": "^1.0.6",
+    "markdown-it": "^14.1.0",
+    "markdown-it-mark": "^4.0.0"
+  }
+}
