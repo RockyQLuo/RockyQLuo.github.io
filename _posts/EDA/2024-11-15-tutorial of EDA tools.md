@@ -7,15 +7,134 @@ tags: []
 img_path: /assets/img/learn/
 ---
 
-## vivado
+## 1. vivado
 [AXI VIP的简单使用](https://icode.best/i/36088746158033)
 
+### 1.1 时序约束
+
+```tcl
+set_property -dict {PACKAGE_PIN AJ16 IOSTANDARD LVCMOS18} [get_ports "led[0]" #管脚约束
+
+set_input_delay 2 –max –clock sysclk [get_ports Dataln] 
+set_input_delay 1 -min –clock sysclk [get_ports Dataln]
+#set input/output delay约束是告诉vivado我们的输入信号和输入时钟之间的延迟关系，跟下面要讲的时钟周期约束是一个原理，让vivado在这个前提下去Place and Route。并不是调节输入信号的延迟
+```
+
+在没有约束的情况下，使用`report_clock_networks -name mainclock` `check_timing -override_defaults no_clock`来检查需要约束的时钟
+
+```tcl
+#用法1：当两个主时钟是异步关系时，而且这两个时钟之间并没有任何的相位关系
+create_clock -period 10 -name clk1 [get_ports clk1]
+create_clock -period 8  -name clk2 [get_ports clk2]
+set_clock_groups -asynchronous -group clk1 -group clk2
+
+#用法2：有两个异步主时钟clk1和clk2，需要验证在clk2频率为100MHz， clk1频率分别为50MHz， 100MHz和200MHz下的时序收敛情况
+create_clock -name clk1A -period 20.0 [get_ports clk1] 
+create_clock -name clk1B -period 10.0 [get_ports clk1] -add 
+create_clock -name clk1C -period 5.0  [get_ports clk1] -add 
+create_clock -name clk2 -period 10.0  [get_ports clk2]
+set_clock_groups -physically_exclusive -group clk1A -group clk1B -group clk1C 
+#physically_exclusive物理上不会同时存在不会有相互影响（电线之间的互相影响）
+#logically_exclusive表示不会同时存在进来
+set_clock_groups —asynchronous —group “clk1A clk1B clk1C” —group clk2
+```
+
+> 之所以要创建虚拟时钟，对于输入来说，是因为输入到FPGA数据的捕获时钟是FPGA内部产生的，与主时钟频率不同；或者PCB上有Clock Buffer导致时钟延迟不同。对于输出来说，下游器件只接收到FPGA发送过去的数据，并没有随路时钟，用自己内部的时钟去捕获数据。下面展示了输入的情况以及相对应的约束应该怎么写：
+{: .prompt-tip }
+
+![virtual_clk]({{ page.img_path }}virtual_clk.png){: width="972" height="589" }
+
+```tcl
+create_clock —name sysclk —period 10 [get_ports clkin]
+create_clock —name virclk —period 6.4
+
+set_input_delay 2 -clock sysclk [get_ports A] 
+set_input_delay 2 -clock virclk [get_ports B]
+```
+
+异步时钟约束只需要两步：
+1. set_false_path
+2. set_max_delay
+
+- 伪路径：set_false_path
+	- 跨时钟域
+	- 上电就被写入数据的寄存器
+	- 异步复位或测试逻辑
+	- 异步双端口RAM
+
+>伪路径指的是该路径存在，但该路径的电路功能不会发生或者无须时序约束。如果路径上的电路不会发生，那Vivado综合后会自动优化掉，因此我们无需考虑这种情况。
+{: .prompt-tip }
+
+### 示例
+时序约束向导是按照`主时钟约束`、`衍生时钟约束`、`输入延迟约束`、`输出延迟约束`、`时序例外约束`、`异步时钟约束`等的顺序来依次创建时钟约束的。
+
+![example1]({{ page.img_path }}example1.png){: width="972" height="589" }
+
+假设只有clk_rx 与 clk_tx以及clk_samp 与 clk2
+
+1. 需要约束两个输入的主时钟
+
+```tcl
+create_clock -period 5   -name clk1 [get_ports clk_pin]
+create_clock -period 25  -name clk2 [get_ports clk_in2]
+```
+
+2. 约束衍生时钟
+
+```tcl
+#MMCM输出的时钟VIVADO会自动约束，所以只需要约束clk_samp和spi_clk
+create_generated_clock -name clk_samp -source [get_pins clk_gen_i0/clk_core_i0/clk_tx] -divide_by 32 [get_pins clk_gen_i0/BUFHCE_clk_samp_i0/O]
+create_generated_clock -name spi_clk  -source [get_pins dac_spi_i0/out_ddr_flop_spi_clk_i0/ODDR_inst/C] -devide_by 1 -invert [get_ports spi_clk_pin]
+#可以使用report_clocks
+
+#如果异步时钟之间存在数据交互，clk_samp和c1t2两个异步时钟之间存在数据交互，因此要进行约
+set_clock_groups -asynchronous -group [get_clocks clk_samp] -group [get_clocks clk2]
+```
+
+3. 延迟约束
+> 有时还要计算PCB上的走线延迟导致的时间差。而且不加延迟约束， Vivado也只是在Timing Report中提示warning，并不会导致时序错误。对于输入管脚，首先判断捕获时钟是主时钟还是衍生时钟，<font color="#d99694">如果是主时钟，直接用set_input_delay即可，如果是衍生时钟，要先创建虚拟时钟，然后再设置delay</font>。<font color="#31859b">对于输出管脚，判断有没有输出随路时钟若有，则直接使用set_output_delay ，若没有，则需要创建虚拟时钟</font>。
+{: .prompt-error}
+
+假设我们有这些输入输出，随路时钟：就是跟随输出一起发出去相关的时钟
+
+![example2]({{ page.img_path }}example2.png){: width="972" height="589" }
+
+```tcl
+create_clock -period 6.000 -name virtual_clock
+set_input_delay -clock virtual_clock -max 0.000 [get_ports lb_sel_pin]
+```
+
+4. false_path
+
+在vivado的timing report中Inter-Clock Paths中的报错（xxclk to yyclk）就是跨时钟域的报错
+
+```tcl
+set_false_path -from [get_clocks clk_rx] -to [get_clocks clk_tx]
+#伪路径的设置是单向的，如果两个时钟直接存在相互的数据的传输，则还需要添加从c1k_tx到clk_rx的路径
+#对于异步复位：
+set_false_path -from [get_ports rst_pin]
+```
+
+
+**vivado的GUI辅助工具**：时序约束编辑器（`Edit Timing Constraints`）和时序约束向导（`Constraints Wizard`）
 
 
 
 
 
-## Verdi
+## 2. DC
+
+
+
+
+
+
+
+
+
+
+
+## 3. Verdi
 
 - 要查看二维数组的值，需要在Makefile及仿真的tb中添加
 [使用VCS观察Verilog二维数组仿真值的方法](https://zhuanlan.zhihu.com/p/119326286)

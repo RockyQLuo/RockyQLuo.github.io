@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 《On Chip Network》
+title: noc(1)--《On Chip Network》
 date: 2024-10-11 22:30 +0800
 categories: [读书笔记, NOC]
 tags: []
