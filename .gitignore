@@ -26,6 +26,7 @@ package-lock.json
 _sass/dist
 assets/js/dist
 
+_posts/secret_note/*
 _posts/.obsidian/*
 _posts/.obsidian/.*
 _posts/.placeholder
