@@ -13,6 +13,7 @@ img_path: /assets/img/image/
 1. [这是一个Network_generate tool](https://github.com/crossroadsfpga/connect/blob/main/README)[该项目调用了Bluespec Compiler](https://github.com/B-Lang-org/bsc))
 2. [AXI Verification IP (VIP) (xilinx.com)](https://www.xilinx.com/products/intellectual-property/axi-vip.html#documentation)
 3. [路由知识内容](https://shili2017.github.io/posts/NOC4/)
+4. 主要内容：Topology、Routing、Buffering、Flow Control
 
 
 
@@ -36,7 +37,7 @@ img_path: /assets/img/image/
  直接网络是每个终端节点（例如，芯片直接网络多处理器中的处理器核心或缓存）与路由器关联的网络；所有路由器既充当流量的源/接收器，又充当来自其他节点的流量的交换机
 ### 2.2 间接拓扑结构: CROSSBARS, BUTTERFLIES, CLOS NETWORKS, AND FAT TREES
 1. crossbar：
->non-blocking as it can always connect a sender to a unique receiver.
+>non-blocking as it can always connect a sender to a unique receiver.依旧需要仲裁，优点是大并发
 2. butterflies：<br>
 ![2-1]({{ page.img_path }}2-1.png){: width="972" height="589" }
 _butterflies的拖拓扑构_
@@ -56,9 +57,14 @@ _对称结构_
 > take advantage of locality
 
 ## 3.流量控制
+### 3.0 Buffering simpler Arb/Scheduling
+
+* Efficient support for variable-size packets，通常要支持不同位宽大小的包（buffer用来缓存flit的大小块）
+
 ### 3.1 下面是基于`Circuit Switching`，`message`，`packet`，`Virtual Cut-Through`的流量控制
 ![2-5]({{ page.img_path }}Pasted image 20241011132438.png){: width="972" height="589" }
-> 在`Virtual Cut-Through`中，带宽和存储仍然以数据包大小为单位分配，只有在下一个下游的路由器有足够的存储空间来容纳整个数据包的情况下，数据包才能继续发送。当包的尺寸较大时，例如，即使节点x的缓冲区可以容纳5个flits中的2个，整个包的传输也会被延迟。
+> 在`Virtual Cut-Through`中，带宽和存储仍然以数据包大小为单位分配，只有在下一个下游的路由器有足够的存储空间来容纳整个数据包的情况下，数据包才能继续发送。当包的尺寸较大时，例如，即使节点x的缓冲区可以容纳5个flits中的2个，整个包的传输也会被延迟。  
+> 也就是说，tail的包会继续传输，直到达到头部拥塞的位置
 {: .prompt-info }
 ### 3.2 基于flit的流量控制
 #### 虫洞（Wormhole）
@@ -68,10 +74,18 @@ _对称结构_
 ![2-6]({{ page.img_path }}Pasted image 20241011141444.png){: width="972" height="589" }
 _虫洞的flit可能跨越多个Router，大量空闲的物理链路_
 ### 3.3 虚拟通道（Virtual Channels）
-最早是作为避免死锁的解决方案被提出的，但也被用于缓解流量控制中的队列头部阻塞（head-of-line blocking）以提升吞吐量
+最早是作为避免死锁的解决方案（原因很复杂，简单来说就是Enforcing switching to a different set of virtual channels on some "turns” can break the cyclic dependency of resources）被提出的，但也被用于缓解流量控制中的队列头部阻塞（head-of-line blocking）以提升吞吐量
 >阻塞在上面所有技术中都会出现，具体来说就是每个输入口都有一个队列，当队列头部的数据包被阻塞时，就会使排在后面的后续数据包停顿，即使停顿的数据包还有可用资源可以使用。
 >Virtual Channels首先在每个路由器上分配一个VC给head flit，其余的flit继承该VC，通过虚拟通道流量控制，不同的包可以在同一物理通道上交错传输。这种技术也被广泛用于解决死锁，包括网络内死锁以及协议级死锁。
 {: .prompt-tip }
+
+****
+![VC_hardware]({{ page.img_path }}VChardware.png){: width="972" height="589" }
+仲裁多个input queue，这样就可以缓解：下图中的HOL Blocking，同时可以支持流量优先级
+![HOL]({{ page.img_path }}HOL.png){: width="972" height="589" }
+
+[Computer Architecture - Lecture 20](https://www.youtube.com/watch?v=jnJpbZUKrJ4&list=PL5Q2soXY2Zi-cAls3cyauNzM7-74Eq31O&index=21)
+
 ![2-7]({{ page.img_path }}Pasted image 20241011152628.png){: width="972" height="589" }
 >上图是一个说明VC流量控制的例子。A最初占用VC 0，目的地是节点4，B最初占用VC 1，目的地是节点2。在T=0时，A和B都有flit在节点0的左边输入VC中等待。A的head flit被分配到路由器1的左边输入VC 0，并获得开关分配，在T=1时前往路由器1。在T=2时，B的head flit获得开关分配并前往路由器1，存储在VC 1，与此同时，A的head flit未能获得路由器4（A的下一条）的VC，节点4的两个VC都被其他包的flit占用。A的第一个body flit继承了VC 0，并在T=3时前往路由器1，与此同时，B的head flit可以在路由器2分配VC 0并继续前进。在T=4时，B的第一个body flit从head flit继承了VC 1，并获得开关分配，继续前往路由器1。到了T=7时，B的所有flit都到达了路由器2，但A的head flit仍然被阻塞，继续等待一个空闲的VC以前往路由器4。
 {: .prompt-info }
@@ -87,14 +101,24 @@ VC0锁住了，利用VC1逃逸。只要有一个无死锁的逃逸VC，所有其
 #### 气泡流量控制（Bubble Flow Control）
 通过插入虚假的bubble来控制数据的进入或阻塞，下图中只有R1允许P1数据包进入
 ![2-11]({{ page.img_path }}Pasted image 20241011195139.png){: width="972" height="589" }
-## 4.缓冲区反压（Buffer Backpressure）<a id="BufferBackpressure" href="#"></a>
+
+## 4 Flow Control
+1. Credit-based flow control，Downstream passes back credits to upstream，buffer的深度需要考虑credit往返的延迟
+2. Ack/NAck flow control，Buffer cannot be deallocated until ACK/NACK received
+
+
+### 4.1 缓冲区反压（Buffer Backpressure）<a id="BufferBackpressure" href="#"></a>
 两个路由器之间的连接在等待下游路由器空出缓冲区时，会空闲6个周期。一旦确定 Flit 将离开路由器并且不再需要其缓冲区，就可以通过触发背压信号（credits 或 on/off ）来优化缓冲区周转时间，而不是等到 Flit 实际从缓冲区中读出。
 > 这意味着这个使用 on/off 背压的网络每个端口至少需要 8 个缓冲区来覆盖周转时间，而如果它选择基于信用的背压，则每个端口需要的缓冲区少 2 个。因此，缓冲区周转时间也会影响面积开销，因为缓冲区占用了路由器占用空间的很大一部分。
 {: .prompt-tip }
 ![2-12]({{ page.img_path }}Pasted image 20241011203634.png){: width="972" height="589" }
 ![2-13]({{ page.img_path }}Pasted image 20241011201756.png){: width="972" height="589" }
 
+
 ## 5.Router微架构
+
+> Routing机制：算术(x_y)、Source Based(source决定output port)、LookupTable（我认为是最好的）
+
 下图中，假设有一个2Dmesh的结构，存在一个本地+4个方向的端口，每个输入端口有4个VC，每个VC有4flits的缓冲队列
 ![2-14]({{ page.img_path }}Pasted image 20241011204435.png){: width="972" height="589" }
 >构成路由器的主要部件是输入缓冲、路由计算逻辑、虚拟通道分配器、开关分配器和crossbar开关。如果不使用源节点路由，1️⃣路由计算器将计算（或查找）当前数据包的输出端口，2️⃣分配器决定哪些flits被选择进入下一个阶段，并穿越crossbar，3️⃣最后crossbar负责将flits从输入端口物理地移动到输出端口。
@@ -185,3 +209,11 @@ _三个请求者，四个资源的分配器设计_
 {: .prompt-tip }
 下图中介绍了几种优化措施，具体见原文page91
 ![5-7]({{ page.img_path }}5-7.png){: width="972" height="589" }
+
+
+
+
+## 6. 一些思考
+
+> 不用buffer可以避免死锁，但是会引来活锁，活锁一般会记录数据包的顺序，router永远优先处理最早的数据包  
+> Handling Contention: 1) Buffer 2) Drop 3) route to somewhere else

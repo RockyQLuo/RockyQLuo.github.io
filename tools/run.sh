@@ -4,7 +4,8 @@
 
 prod=false
 command="bundle exec jekyll s -l"
-host="127.0.0.1"
+#host="127.0.0.1"
+host="0.0.0.0"
 
 help() {
   echo "Usage:"
@@ -46,7 +47,13 @@ if $prod; then
   command="JEKYLL_ENV=production $command"
 fi
 
+
+# Enable force_polling for Docker or network filesystems (NAS, NFS, etc.)
 if [ -e /proc/1/cgroup ] && grep -q docker /proc/1/cgroup; then
+  command="$command --force_polling"
+elif [[ "$PWD" =~ ^/mnt/ ]] || [[ "$PWD" =~ ^/media/ ]]; then
+  # Working directory is on a mounted filesystem, likely NAS or network storage
+  # Use polling instead of inotify which doesn't work on network filesystems
   command="$command --force_polling"
 fi
 
